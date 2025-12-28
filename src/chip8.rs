@@ -149,7 +149,6 @@ impl Chip8 {
             (0xA, _, _, _) => self.index = nnn, // LD I, addr
             (0xB, _, _, _) => self.pc = (self.registers[0] as u16).wrapping_add(nnn), // JP V0, addr
             (0xC, _, _, _) => { // RND Vx, byte
-                // CORRECCIÓN 1: Usar r#gen() para evitar conflicto con keyword
                 let rng: u8 = rand::random(); 
                 self.registers[x] = rng & nn;
             },
@@ -179,8 +178,6 @@ impl Chip8 {
             (0xE, _, _, 0xE) => if self.keypad[self.registers[x] as usize] { self.pc += 2 }, // SKP Vx
             (0xE, _, _, 0x1) => if !self.keypad[self.registers[x] as usize] { self.pc += 2 }, // SKNP Vx
             
-            // CORRECCIÓN 2: Desambiguar opcodes F que colisionan (LD DT vs LD [I] vs LD Vx,[I])
-            // Antes (0xF, _, _, 0x7) es único.
             (0xF, _, _, 0x7) => self.registers[x] = self.delay_timer,
             
             // Fx0A es único
@@ -197,8 +194,7 @@ impl Chip8 {
                     self.pc -= 2;
                 }
             },
-            
-            // AQUÍ ESTABA EL ERROR DE PATRÓN INALCANZABLE:
+
             // Fx15 (LD DT, Vx) - termina en 5, pero el segundo nibble es 1
             (0xF, _, 0x1, 0x5) => self.delay_timer = self.registers[x],
             
