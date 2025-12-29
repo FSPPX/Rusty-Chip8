@@ -11,6 +11,7 @@ pub struct Platform {
     texture_creator: sdl2::render::TextureCreator<sdl2::video::WindowContext>,
     event_pump: EventPump,
     audio_device: AudioDevice<SquareWave>,
+    texture_buffer: Vec<u8>,
     width: u32,
     height: u32,
 }
@@ -41,6 +42,7 @@ impl Platform {
             channels: Some(1), // Mono
             samples: None,
         };
+        let texture_buffer = vec![0u8; (texture_width * texture_height * 4) as usize];
 
         let audio_device = audio_subsystem.open_playback(None, &desired_spec, |spec| {
             // 440.0 Hz is the frequency for the A4 note
@@ -56,6 +58,7 @@ impl Platform {
             texture_creator,
             event_pump,
             audio_device,
+            texture_buffer,
             width: texture_width,
             height: texture_height,
         })
@@ -68,13 +71,17 @@ impl Platform {
             self.height
         ).map_err(|e| e.to_string())?;
 
-        let mut raw_buffer = Vec::with_capacity(buffer.len() * 4);
-        for &pixel in buffer {
+        for (i, &pixel) in buffer.iter().enumerate() {
             let bytes = pixel.to_be_bytes();
-            raw_buffer.extend_from_slice(&bytes);
+            let idx = i * 4;
+            // Sobrescribimos los valores existentes
+            self.texture_buffer[idx] = bytes[0];
+            self.texture_buffer[idx + 1] = bytes[1];
+            self.texture_buffer[idx + 2] = bytes[2];
+            self.texture_buffer[idx + 3] = bytes[3];
         }
 
-        texture.update(None, &raw_buffer, pitch * 4)
+        texture.update(None, &self.texture_buffer, pitch * 4)
             .map_err(|e| e.to_string())?;
         
         self.canvas.clear();
