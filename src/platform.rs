@@ -1,4 +1,4 @@
-use sdl2::pixels::PixelFormatEnum; // Quitados Color y Texture innecesarios
+use sdl2::pixels::PixelFormatEnum;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::render::Canvas;
@@ -27,6 +27,7 @@ impl Platform {
 
         let mut canvas = window.into_canvas().build().map_err(|e| e.to_string())?;
         
+        // Logical size allows automatic scaling while maintaining aspect ratio
         canvas.set_logical_size(texture_width, texture_height).map_err(|e| e.to_string())?;
         
         let texture_creator = canvas.texture_creator();
@@ -54,7 +55,6 @@ impl Platform {
             raw_buffer.extend_from_slice(&bytes);
         }
 
-        // CORRECCIÓN: map_err para convertir UpdateTextureError a String
         texture.update(None, &raw_buffer, pitch * 4)
             .map_err(|e| e.to_string())?;
         
@@ -82,6 +82,7 @@ impl Platform {
     }
 }
 
+// Maps keyboard keys to CHIP-8's 16-key hexadecimal keypad (0-F)
 fn key_map(key: Keycode) -> Option<usize> {
     match key {
         Keycode::X => Some(0x0),

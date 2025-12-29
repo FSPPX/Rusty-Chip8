@@ -7,7 +7,7 @@ const MEMORY_SIZE: usize = 4096;
 const REGISTER_COUNT: usize = 16;
 const STACK_LEVELS: usize = 16;
 const KEY_COUNT: usize = 16;
-const START_ADDRESS: usize = 0x200;
+const START_ADDRESS: usize = 0x200; // ROM programs start at 0x200 in CHIP-8 memory
 const FONTSET_START_ADDRESS: usize = 0x50;
 
 const FONTSET: [u8; 80] = [
@@ -69,11 +69,9 @@ impl Chip8 {
         let mut buffer = Vec::new();
         file.read_to_end(&mut buffer).expect("Error leyendo ROM");
 
-        for (i, &byte) in buffer.iter().enumerate() {
-            if START_ADDRESS + i < MEMORY_SIZE {
-                self.memory[START_ADDRESS + i] = byte;
-            }
-        }
+        let max_copy = MEMORY_SIZE - START_ADDRESS;
+        let len = buffer.len().min(max_copy);
+        self.memory[START_ADDRESS..START_ADDRESS + len].copy_from_slice(&buffer[..len]);
     }
 
     pub fn cycle(&mut self) {
@@ -166,6 +164,7 @@ impl Chip8 {
                         if sprite_pixel != 0 {
                             let idx = (y_pos + row) * VIDEO_WIDTH + (x_pos + col);
                             if idx < self.video.len() {
+                                // VF set to 1 if any pixel is erased (collision detection)
                                 if self.video[idx] == 0xFFFFFFFF {
                                     self.registers[0xF] = 1;
                                 }
@@ -180,8 +179,7 @@ impl Chip8 {
             
             (0xF, _, _, 0x7) => self.registers[x] = self.delay_timer,
             
-            // Fx0A es único
-            (0xF, _, _, 0xA) => { // LD Vx, K
+            (0xF, _, _, 0xA) => { // LD Vx, K - Wait for key press
                 let mut pressed = false;
                 for i in 0..KEY_COUNT {
                     if self.keypad[i] {
@@ -190,24 +188,25 @@ impl Chip8 {
                         break;
                     }
                 }
+                // Repeat instruction until a key is pressed
                 if !pressed {
                     self.pc -= 2;
                 }
             },
 
-            // Fx15 (LD DT, Vx) - termina en 5, pero el segundo nibble es 1
+            // Fx15 (LD DT, Vx)
             (0xF, _, 0x1, 0x5) => self.delay_timer = self.registers[x],
             
-            // Fx18 (LD ST, Vx) - termina en 8
+            // Fx18 (LD ST, Vx)
             (0xF, _, _, 0x8) => self.sound_timer = self.registers[x],
             
-            // Fx1E (ADD I, Vx) - termina en E
+            // Fx1E (ADD I, Vx)
             (0xF, _, _, 0xE) => self.index = self.index.wrapping_add(self.registers[x] as u16),
             
-            // Fx29 (LD F, Vx) - termina en 9
+            // Fx29 (LD F, Vx)
             (0xF, _, _, 0x9) => self.index = FONTSET_START_ADDRESS as u16 + (self.registers[x] as u16 * 5),
             
-            // Fx33 (LD B, Vx) - termina en 3
+            // Fx33 (LD B, Vx)
             (0xF, _, _, 0x3) => { 
                 let mut value = self.registers[x];
                 self.memory[self.index as usize + 2] = value % 10;
@@ -217,14 +216,14 @@ impl Chip8 {
                 self.memory[self.index as usize] = value;
             },
             
-            // Fx55 (LD [I], Vx) - termina en 5, segundo nibble es 5
+            // Fx55 (LD [I], Vx)
             (0xF, _, 0x5, 0x5) => { 
                  for i in 0..=x {
                      self.memory[self.index as usize + i] = self.registers[i];
                  }
             },
             
-            // Fx65 (LD Vx, [I]) - termina en 5, segundo nibble es 6
+            // Fx65 (LD Vx, [I])
             (0xF, _, 0x6, 0x5) => { 
                  for i in 0..=x {
                      self.registers[i] = self.memory[self.index as usize + i];
