@@ -54,6 +54,7 @@ fn main() -> Result<(), String> {
             last_cycle_time = current_time;
             
             chip8.cycle();
+            platform.play_beep(chip8.should_play_sound());
             platform.update(&chip8.video, video_pitch)?;
         }
     }

@@ -12,7 +12,7 @@ CHIP-8 is an interpreted programming language developed in the mid-1970s. It was
 - 64x32 monochrome display
 - SDL2-based rendering and input handling
 - Keyboard input mapping
-- Sound timer support
+- Sound timer support with audio playback (beep sound)
 
 ## Building and Running
 

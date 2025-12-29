@@ -4,11 +4,13 @@ use sdl2::keyboard::Keycode;
 use sdl2::render::Canvas;
 use sdl2::video::Window;
 use sdl2::EventPump;
+use sdl2::audio::{AudioCallback, AudioSpecDesired, AudioDevice};
 
 pub struct Platform {
     canvas: Canvas<Window>,
     texture_creator: sdl2::render::TextureCreator<sdl2::video::WindowContext>,
     event_pump: EventPump,
+    audio_device: AudioDevice<SquareWave>,
     width: u32,
     height: u32,
 }
@@ -17,6 +19,7 @@ impl Platform {
     pub fn new(title: &str, window_width: u32, window_height: u32, texture_width: u32, texture_height: u32) -> Result<Self, String> {
         let sdl_context = sdl2::init()?;
         let video_subsystem = sdl_context.video()?;
+        let audio_subsystem = sdl_context.audio()?;
 
         let window = video_subsystem.window(title, window_width, window_height)
             .position_centered()
@@ -33,10 +36,26 @@ impl Platform {
         let texture_creator = canvas.texture_creator();
         let event_pump = sdl_context.event_pump()?;
 
+        let desired_spec = AudioSpecDesired {
+            freq: Some(44100),
+            channels: Some(1), // Mono
+            samples: None,
+        };
+
+        let audio_device = audio_subsystem.open_playback(None, &desired_spec, |spec| {
+            // 440.0 Hz is the frequency for the A4 note
+            SquareWave {
+                phase_inc: 440.0 / spec.freq as f32,
+                phase: 0.0,
+                volume: 0.25, // 25% of max volume
+            }
+        }).map_err(|e| e.to_string())?;
+
         Ok(Platform {
             canvas,
             texture_creator,
             event_pump,
+            audio_device,
             width: texture_width,
             height: texture_height,
         })
@@ -80,6 +99,14 @@ impl Platform {
         }
         false
     }
+
+    pub fn play_beep(&self, play: bool) {
+        if play {
+            self.audio_device.resume();
+        } else {
+            self.audio_device.pause();
+        }
+    }
 }
 
 // Maps keyboard keys to CHIP-8's 16-key hexadecimal keypad (0-F)
@@ -102,5 +129,27 @@ fn key_map(key: Keycode) -> Option<usize> {
         Keycode::F => Some(0xE),
         Keycode::V => Some(0xF),
         _ => None,
+    }
+}
+
+struct SquareWave {
+    phase_inc: f32,
+    phase: f32,
+    volume: f32,
+}
+
+impl AudioCallback for SquareWave {
+    type Channel = f32;
+
+    fn callback(&mut self, out: &mut [f32]) {
+        // Generate a simple square wave
+        for x in out.iter_mut() {
+            *x = if self.phase <= 0.5 {
+                self.volume
+            } else {
+                -self.volume
+            };
+            self.phase = (self.phase + self.phase_inc) % 1.0;
+        }
     }
 }

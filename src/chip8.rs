@@ -233,4 +233,8 @@ impl Chip8 {
             _ => println!("Opcode desconocido: {:X}", opcode),
         }
     }
+
+    pub fn should_play_sound(&self) -> bool {
+        self.sound_timer > 0
+    }
 }
